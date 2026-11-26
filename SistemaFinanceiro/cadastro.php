@@ -10,73 +10,67 @@ $mensagem = "";
 $tipoMensagem = "";
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $email = isset($_POST["email"]) ? trim($_POST["email"]) : "";
-    $senha = isset($_POST["senha"]) ? $_POST["senha"] : "";
-    $confirmarSenha = isset($_POST["confirmarSenha"]) ? $_POST["confirmarSenha"] : "";
+    $email = trim($_POST["email"] ?? "");
+    $senha = $_POST["senha"] ?? "";
+    $confirmarSenha = $_POST["confirmarSenha"] ?? "";
 
     if ($email === "" || $senha === "" || $confirmarSenha === "") {
         $mensagem = "Preencha todos os campos.";
         $tipoMensagem = "erro";
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $mensagem = "Informe um e-mail válido.";
+    } elseif (
+        !filter_var($email, FILTER_VALIDATE_EMAIL)
+        || !preg_match('/\.com(?:\.br)?$/i', $email)
+    ) {
+        $mensagem = "Informe um e-mail válido terminado em .com.";
+        $tipoMensagem = "erro";
+    } elseif (strlen($senha) < 6) {
+        $mensagem = "A senha deve ter pelo menos 6 caracteres.";
         $tipoMensagem = "erro";
     } elseif ($senha !== $confirmarSenha) {
         $mensagem = "As senhas não coincidem.";
         $tipoMensagem = "erro";
-    } elseif (!function_exists("password_hash")) {
-        $mensagem = "Atualize o PHP para uma versão igual ou superior a 5.5.";
-        $tipoMensagem = "erro";
     } else {
-        $sqlVerifica = "SELECT cd_usuario
-                        FROM tb_usuario
-                        WHERE ds_email = ?
-                        LIMIT 1";
+        $consulta =
+            "SELECT cd_usuario
+             FROM tb_usuario
+             WHERE ds_email = ?
+             LIMIT 1";
 
-        $stmtVerifica = $conexao->prepare($sqlVerifica);
+        $stmt = $conexao->prepare($consulta);
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $stmt->store_result();
 
-        if (!$stmtVerifica) {
-            $mensagem = "Erro ao preparar a consulta.";
+        if ($stmt->num_rows > 0) {
+            $mensagem = "Este e-mail já está cadastrado.";
             $tipoMensagem = "erro";
+            $stmt->close();
         } else {
-            $stmtVerifica->bind_param("s", $email);
-            $stmtVerifica->execute();
-            $stmtVerifica->store_result();
+            $stmt->close();
 
-            if ($stmtVerifica->num_rows > 0) {
-                $mensagem = "Este e-mail já está cadastrado.";
-                $tipoMensagem = "erro";
-            } else {
-                $nome = "Usuário";
-                $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
+            $nome = "Usuário";
+            $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
 
-                $sqlInsert = "INSERT INTO tb_usuario
-                              (nm_usuario, ds_senha, ds_email)
-                              VALUES (?, ?, ?)";
+            $sql =
+                "INSERT INTO tb_usuario
+                    (nm_usuario, ds_senha, ds_email)
+                 VALUES (?, ?, ?)";
 
-                $stmtInsert = $conexao->prepare($sqlInsert);
+            $stmt = $conexao->prepare($sql);
+            $stmt->bind_param("sss", $nome, $senhaHash, $email);
 
-                if (!$stmtInsert) {
-                    $mensagem = "Erro ao preparar o cadastro.";
-                    $tipoMensagem = "erro";
-                } else {
-                    $stmtInsert->bind_param("sss", $nome, $senhaHash, $email);
+            if ($stmt->execute()) {
+                $stmt->close();
+                $_SESSION["cadastro_ok"] =
+                    "Cadastro realizado. Faça login.";
 
-                    if ($stmtInsert->execute()) {
-                        $stmtInsert->close();
-                        $stmtVerifica->close();
-
-                        header("Location: login.php?cadastro=ok");
-                        exit;
-                    } else {
-                        $mensagem = "Não foi possível cadastrar.";
-                        $tipoMensagem = "erro";
-                    }
-
-                    $stmtInsert->close();
-                }
+                header("Location: login.php");
+                exit;
             }
 
-            $stmtVerifica->close();
+            $mensagem = "Não foi possível cadastrar.";
+            $tipoMensagem = "erro";
+            $stmt->close();
         }
     }
 }
@@ -93,14 +87,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       box-sizing: border-box;
     }
 
-    html,
-    body {
+    html, body {
       margin: 0;
       padding: 0;
       width: 100%;
       min-height: 100%;
       font-family: Arial, sans-serif;
-      background: #ffffff;
+      background: #fff;
     }
 
     .tela {
@@ -112,16 +105,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     .painel-logo {
       width: 50%;
       min-height: 100vh;
-      background: linear-gradient(180deg, #b900d8 0%, #a800cf 100%);
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 40px;
+      background: linear-gradient(180deg, #b900d8, #a800cf);
     }
 
     .logo-bloco {
       text-align: center;
-      color: #ffffff;
+      color: #fff;
     }
 
     .logo-nome {
@@ -132,15 +125,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       margin-bottom: 10px;
       font-size: 48px;
       font-weight: bold;
-      letter-spacing: -1px;
     }
 
     .logo-circulo {
       width: 28px;
       height: 28px;
-      border-radius: 50%;
-      background: #ffffff;
       flex-shrink: 0;
+      border-radius: 50%;
+      background: #fff;
     }
 
     .logo-descricao {
@@ -155,7 +147,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       align-items: center;
       justify-content: center;
       padding: 40px 30px;
-      background: #ffffff;
     }
 
     .formulario {
@@ -165,7 +156,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     .formulario h1 {
       margin: 0 0 28px;
-      color: #111111;
       font-size: 22px;
       text-align: center;
     }
@@ -177,9 +167,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     .form-label {
       display: block;
       margin-bottom: 6px;
-      color: #222222;
       font-size: 13px;
       font-weight: bold;
+    }
+
+    .senha-container {
+      position: relative;
     }
 
     .form-control {
@@ -187,8 +180,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       height: 42px;
       border: 1px solid #dc55f2;
       border-radius: 8px;
-      padding: 9px 12px;
-      color: #222222;
+      padding: 9px 44px 9px 12px;
       font-size: 14px;
       outline: none;
     }
@@ -198,22 +190,45 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       box-shadow: 0 0 0 3px rgba(185, 0, 216, 0.12);
     }
 
-    .btn-lekan {
-      width: 100%;
-      height: 44px;
-      margin-top: 6px;
-      border: none;
-      border-radius: 8px;
-      background: #b900d8;
-      color: #ffffff;
-      font-size: 14px;
-      font-weight: bold;
+    .olho-senha {
+      position: absolute;
+      top: 50%;
+      right: 10px;
+      width: 28px;
+      height: 28px;
+      transform: translateY(-50%);
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 50%;
+      padding: 0;
+      background: transparent;
+      color: #777;
       cursor: pointer;
     }
 
-    .btn-lekan:hover,
-    .btn-lekan:focus {
-      background: #a000bd;
+    .olho-senha:hover,
+    .olho-senha:focus-visible {
+      background: #f3e4f8;
+      color: #a000bd;
+      outline: none;
+    }
+
+    .olho-senha svg {
+      width: 19px;
+      height: 19px;
+    }
+
+    .btn-lekan {
+      width: 100%;
+      height: 44px;
+      border: none;
+      border-radius: 8px;
+      background: #b900d8;
+      color: #fff;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
     }
 
     .mensagem {
@@ -236,19 +251,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     .link-box {
       margin-top: 18px;
-      color: #333333;
       text-align: center;
       font-size: 13px;
     }
 
     .link-box a {
       color: #b900d8;
-      text-decoration: none;
       font-weight: bold;
-    }
-
-    .link-box a:hover {
-      text-decoration: underline;
+      text-decoration: none;
     }
 
     @media (max-width: 768px) {
@@ -256,25 +266,24 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         flex-direction: column;
       }
 
-      .painel-logo {
+      .painel-logo,
+      .painel-cadastro {
         width: 100%;
-        min-height: 220px;
-        height: 35vh;
-        padding: 25px;
       }
 
-      .logo-nome {
-        font-size: 38px;
+      .painel-logo {
+        min-height: 220px;
+        height: 35vh;
       }
 
       .painel-cadastro {
-        width: 100%;
         min-height: 65vh;
         padding: 30px 22px;
       }
     }
   </style>
 </head>
+
 <body>
   <main class="tela">
     <section class="painel-logo">
@@ -283,7 +292,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
           <span class="logo-circulo"></span>
           <span>LEKAN</span>
         </div>
-        <p class="logo-descricao">Gestão financeira para a sua empresa</p>
+
+        <p class="logo-descricao">
+          Gestão financeira para a sua empresa
+        </p>
       </div>
     </section>
 
@@ -291,48 +303,91 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       <form class="formulario" method="POST" action="cadastro.php">
         <h1>Cadastrar</h1>
 
-        <?php if ($mensagem !== "") { ?>
-          <p class="mensagem <?php echo htmlspecialchars($tipoMensagem, ENT_QUOTES, "UTF-8"); ?>">
-            <?php echo htmlspecialchars($mensagem, ENT_QUOTES, "UTF-8"); ?>
+        <?php if ($mensagem !== ""): ?>
+          <p class="mensagem <?= htmlspecialchars($tipoMensagem) ?>">
+            <?= htmlspecialchars($mensagem) ?>
           </p>
-        <?php } ?>
+        <?php endif; ?>
 
         <div class="mb-campo">
           <label for="email" class="form-label">E-mail *</label>
+
           <input
             type="email"
             class="form-control"
             id="email"
             name="email"
             maxlength="100"
-            value="<?php echo isset($_POST["email"]) ? htmlspecialchars(trim($_POST["email"]), ENT_QUOTES, "UTF-8") : ""; ?>"
+            value="<?= htmlspecialchars($email ?? "") ?>"
             required
           >
         </div>
 
         <div class="mb-campo">
           <label for="senha" class="form-label">Senha *</label>
-          <input
-            type="password"
-            class="form-control"
-            id="senha"
-            name="senha"
-            required
-          >
+
+          <div class="senha-container">
+            <input
+              type="password"
+              class="form-control"
+              id="senha"
+              name="senha"
+              minlength="6"
+              required
+            >
+
+            <button
+              type="button"
+              class="olho-senha"
+              aria-label="Mostrar senha"
+              onclick="alternarSenha('senha', this)"
+            >
+              <svg viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="1.8"
+                   stroke-linecap="round" stroke-linejoin="round"
+                   aria-hidden="true">
+                <path d="M2.5 12s3.5-5 9.5-5 9.5 5 9.5 5-3.5 5-9.5 5-9.5-5-9.5-5Z"/>
+                <circle cx="12" cy="12" r="2.5"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div class="mb-campo">
-          <label for="confirmarSenha" class="form-label">Confirmar senha *</label>
-          <input
-            type="password"
-            class="form-control"
-            id="confirmarSenha"
-            name="confirmarSenha"
-            required
-          >
+          <label for="confirmarSenha" class="form-label">
+            Confirmar senha *
+          </label>
+
+          <div class="senha-container">
+            <input
+              type="password"
+              class="form-control"
+              id="confirmarSenha"
+              name="confirmarSenha"
+              minlength="6"
+              required
+            >
+
+            <button
+              type="button"
+              class="olho-senha"
+              aria-label="Mostrar confirmação"
+              onclick="alternarSenha('confirmarSenha', this)"
+            >
+              <svg viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="1.8"
+                   stroke-linecap="round" stroke-linejoin="round"
+                   aria-hidden="true">
+                <path d="M2.5 12s3.5-5 9.5-5 9.5 5 9.5 5-3.5 5-9.5 5-9.5-5-9.5-5Z"/>
+                <circle cx="12" cy="12" r="2.5"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <button type="submit" class="btn-lekan">Cadastrar</button>
+        <button type="submit" class="btn-lekan">
+          Cadastrar
+        </button>
 
         <div class="link-box">
           <span>Já tem conta?</span>
@@ -341,5 +396,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       </form>
     </section>
   </main>
+
+  <script>
+    function alternarSenha(idCampo, botao) {
+      const campo = document.getElementById(idCampo);
+
+      if (campo.type === "password") {
+        campo.type = "text";
+        botao.setAttribute(
+          "aria-label",
+          "Ocultar senha"
+        );
+      } else {
+        campo.type = "password";
+        botao.setAttribute(
+          "aria-label",
+          "Mostrar senha"
+        );
+      }
+    }
+  </script>
 </body>
-</html>   
+</html>
