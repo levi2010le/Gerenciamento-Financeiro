@@ -22,10 +22,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if ($email === "" || $senha === "") {
         $mensagem = "Preencha e-mail e senha.";
         $tipoMensagem = "erro";
+    } elseif (
+        !filter_var($email, FILTER_VALIDATE_EMAIL)
+        || !preg_match('/\.com(?:\.br)?$/i', $email)
+    ) {
+        $mensagem = "Informe um e-mail válido terminado em .com.";
+        $tipoMensagem = "erro";
+    } elseif (strlen($senha) < 6) {
+        $mensagem = "A senha deve ter pelo menos 6 caracteres.";
+        $tipoMensagem = "erro";
     } else {
         try {
             $sql =
-                "SELECT cd_usuario, ds_email, ds_senha
+                "SELECT cd_usuario, nm_usuario, ds_email, ds_senha
                  FROM tb_usuario
                  WHERE ds_email = ?
                  LIMIT 1";
@@ -33,20 +42,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $stmt = $conexao->prepare($sql);
             $stmt->bind_param("s", $email);
             $stmt->execute();
-            $resultado = $stmt->get_result();
-            $usuario = $resultado->fetch_assoc();
+            $usuario = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
 
-            if (
-                $usuario &&
-                password_verify(
-                    $senha,
-                    $usuario["ds_senha"]
-                )
-            ) {
+            if ($usuario && password_verify($senha, $usuario["ds_senha"])) {
                 session_regenerate_id(true);
 
-                $_SESSION["usuario_id"] = $usuario["cd_usuario"];
+                $_SESSION["usuario_id"] = (int) $usuario["cd_usuario"];
                 $_SESSION["usuario_email"] = $usuario["ds_email"];
+                $_SESSION["usuario_nome"] =
+                    trim($usuario["nm_usuario"] ?? "") ?: "Usuário";
+
+                if (empty($_SESSION["csrf_token"])) {
+                    $_SESSION["csrf_token"] =
+                        bin2hex(random_bytes(32));
+                }
 
                 header("Location: home.php");
                 exit;
@@ -73,14 +83,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       box-sizing: border-box;
     }
 
-    html,
-    body {
+    html, body {
       width: 100%;
       min-height: 100%;
       margin: 0;
-      padding: 0;
       font-family: Arial, sans-serif;
-      background: #ffffff;
+      background: #fff;
     }
 
     .tela {
@@ -92,16 +100,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     .painel-logo {
       width: 50%;
       min-height: 100vh;
-      padding: 40px;
-      background: linear-gradient(180deg, #b900d8 0%, #a800cf 100%);
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 40px;
+      background: linear-gradient(180deg, #b900d8, #a800cf);
     }
 
     .logo-bloco {
       text-align: center;
-      color: #ffffff;
+      color: #fff;
     }
 
     .logo-nome {
@@ -112,15 +120,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       margin-bottom: 10px;
       font-size: 48px;
       font-weight: bold;
-      letter-spacing: -1px;
     }
 
     .logo-circulo {
       width: 28px;
       height: 28px;
-      flex-shrink: 0;
       border-radius: 50%;
-      background: #ffffff;
+      background: #fff;
     }
 
     .logo-descricao {
@@ -131,11 +137,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     .painel-login {
       width: 50%;
       min-height: 100vh;
-      padding: 40px 30px;
-      background: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 40px 30px;
     }
 
     .formulario {
@@ -145,7 +150,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     .formulario h1 {
       margin: 0 0 28px;
-      color: #111111;
       font-size: 22px;
       text-align: center;
     }
@@ -157,9 +161,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     .form-label {
       display: block;
       margin-bottom: 6px;
-      color: #222222;
       font-size: 13px;
       font-weight: bold;
+    }
+
+    .senha-container {
+      position: relative;
     }
 
     .form-control {
@@ -167,8 +174,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       height: 42px;
       border: 1px solid #dc55f2;
       border-radius: 8px;
-      padding: 9px 12px;
-      color: #222222;
+      padding: 9px 44px 9px 12px;
       font-size: 14px;
       outline: none;
     }
@@ -178,6 +184,35 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       box-shadow: 0 0 0 3px rgba(185, 0, 216, 0.12);
     }
 
+    .olho-senha {
+      position: absolute;
+      top: 50%;
+      right: 10px;
+      width: 28px;
+      height: 28px;
+      transform: translateY(-50%);
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 50%;
+      padding: 0;
+      background: transparent;
+      color: #777;
+      cursor: pointer;
+    }
+
+    .olho-senha:hover,
+    .olho-senha:focus-visible {
+      background: #f3e4f8;
+      color: #a000bd;
+      outline: none;
+    }
+
+    .olho-senha svg {
+      width: 19px;
+      height: 19px;
+    }
+
     .btn-lekan {
       width: 100%;
       height: 44px;
@@ -185,19 +220,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       border: none;
       border-radius: 8px;
       background: #b900d8;
-      color: #ffffff;
+      color: #fff;
       font-size: 14px;
       font-weight: bold;
       cursor: pointer;
     }
 
-    .btn-lekan:hover,
-    .btn-lekan:focus {
+    .btn-lekan:hover {
       background: #a000bd;
     }
 
     .mensagem {
-      min-height: 20px;
       margin: 0 0 16px;
       padding: 10px;
       border-radius: 6px;
@@ -217,19 +250,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     .link-box {
       margin-top: 18px;
-      color: #333333;
       text-align: center;
       font-size: 13px;
     }
 
     .link-box a {
       color: #b900d8;
-      text-decoration: none;
       font-weight: bold;
-    }
-
-    .link-box a:hover {
-      text-decoration: underline;
+      text-decoration: none;
     }
 
     @media (max-width: 768px) {
@@ -256,6 +284,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
   </style>
 </head>
+
 <body>
   <main class="tela">
     <section class="painel-logo">
@@ -264,6 +293,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
           <span class="logo-circulo"></span>
           <span>LEKAN</span>
         </div>
+
         <p class="logo-descricao">
           Gestão financeira para a sua empresa
         </p>
@@ -275,33 +305,53 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         <h1>Entrar</h1>
 
         <?php if ($mensagem !== ""): ?>
-          <p class="mensagem <?= htmlspecialchars($tipoMensagem, ENT_QUOTES, "UTF-8") ?>">
-            <?= htmlspecialchars($mensagem, ENT_QUOTES, "UTF-8") ?>
+          <p class="mensagem <?= htmlspecialchars($tipoMensagem) ?>">
+            <?= htmlspecialchars($mensagem) ?>
           </p>
         <?php endif; ?>
 
         <div class="mb-campo">
           <label for="email" class="form-label">E-mail *</label>
+
           <input
             type="email"
             class="form-control"
             id="email"
             name="email"
             maxlength="100"
-            value="<?= htmlspecialchars($email ?? "", ENT_QUOTES, "UTF-8") ?>"
+            value="<?= htmlspecialchars($email ?? "") ?>"
             required
           >
         </div>
 
         <div class="mb-campo">
           <label for="senha" class="form-label">Senha *</label>
-          <input
-            type="password"
-            class="form-control"
-            id="senha"
-            name="senha"
-            required
-          >
+
+          <div class="senha-container">
+            <input
+              type="password"
+              class="form-control"
+              id="senha"
+              name="senha"
+              minlength="6"
+              required
+            >
+
+            <button
+              type="button"
+              class="olho-senha"
+              aria-label="Mostrar senha"
+              onclick="alternarSenha('senha', this)"
+            >
+              <svg class="icone-olho" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="1.8"
+                   stroke-linecap="round" stroke-linejoin="round"
+                   aria-hidden="true">
+                <path d="M2.5 12s3.5-5 9.5-5 9.5 5 9.5 5-3.5 5-9.5 5-9.5-5-9.5-5Z"/>
+                <circle cx="12" cy="12" r="2.5"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <button type="submit" class="btn-lekan">Entrar</button>
@@ -313,5 +363,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       </form>
     </section>
   </main>
+
+  <script>
+    function alternarSenha(idCampo, botao) {
+      const campo = document.getElementById(idCampo);
+
+      if (campo.type === "password") {
+        campo.type = "text";
+        botao.setAttribute("aria-label", "Ocultar senha");
+      } else {
+        campo.type = "password";
+        botao.setAttribute("aria-label", "Mostrar senha");
+      }
+    }
+  </script>
 </body>
 </html>
