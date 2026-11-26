@@ -1130,10 +1130,13 @@ $saidasMes =
             <div class="user-avatar">L+K</div>
 
             <div class="user-data">
-              <strong>
-              Usuario
-              </strong>
-            </div>
+               <strong>
+              <?= htmlspecialchars(
+                  $_SESSION["usuario_nome"] ?? "Usuário",
+                  ENT_QUOTES,
+                  "UTF-8"
+              ) ?>
+            </strong>
           </div>
 
           <a class="logout" href="logout.php">Sair</a>
@@ -1145,7 +1148,7 @@ $saidasMes =
           <div class="title">Sistema Financeiro</div>
 
           <div class="topbar-right">
-            <div class="avatar">👤</div>
+              <?php require __DIR__ . "/perfil-menu.php"; ?>
           </div>
         </div>
 
