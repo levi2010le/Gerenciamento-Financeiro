@@ -804,7 +804,13 @@ $totalAtrasado =
           <div class="user-box">
             <div class="user-avatar">L+K</div>
             <div class="user-data">
-              <strong>Usuario</strong>
+              <strong>
+              <?= htmlspecialchars(
+                  $_SESSION["usuario_nome"] ?? "Usuário",
+                  ENT_QUOTES,
+                  "UTF-8"
+              ) ?>
+            </strong>
             </div>
           </div>
 
@@ -816,7 +822,7 @@ $totalAtrasado =
         <div class="topbar">
           <div class="title">Sistema Financeiro</div>
           <div class="topbar-right">
-            <div class="avatar">👤</div>
+              <?php require __DIR__ . "/perfil-menu.php"; ?>
           </div>
         </div>
 
